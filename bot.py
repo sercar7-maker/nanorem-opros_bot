@@ -70,6 +70,13 @@ def calculate_treatment_cost(aggregate, engine_volume, oil_volume):
 
 
 
+import logging
+import os
+import json
+import re
+from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
 
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
@@ -80,6 +87,55 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+
+load_dotenv()
+logging.basicConfig(level=logging.INFO)
+
+# Стоимость обработки за 1 литр (базовая ставка)
+MATERIAL_PRICE_PER_LITER = 1000.0
+
+# ID администратора
+ADMIN_CHAT_ID = 899738024
+
+# Дозировки
+RVS_DOSE_ML_PER_L_ENGINE = 10.0
+ACCEL_DOSE_ML_PER_L_OIL = 2.5
+
+# Цены и наценка (из .env)
+RVS_PRICE_PER_ML = float(os.getenv("RVS_PRICE_PER_ML", "0.8"))
+ACCEL_PRICE_PER_ML = float(os.getenv("ACCEL_PRICE_PER_ML", "0.6"))
+MARKUP_COEF = float(os.getenv("MARKUP_COEF", "2.0"))
+
+AGGREGATE_COEFFICIENTS = {
+    "Двигатель": 1.0,
+    "МКПП": 1.1,
+    "АКПП": 1.2,
+    "Вариатор": 1.3,
+    "ГУР": 0.8,
+}
+
+
+def calculate_treatment_cost(aggregate, engine_volume, oil_volume):
+    if aggregate == "Двигатель" and engine_volume is not None and oil_volume is not None:
+        rvs_ml = engine_volume * RVS_DOSE_ML_PER_L_ENGINE
+        accel_ml = oil_volume * ACCEL_DOSE_ML_PER_L_OIL
+    else:
+        if oil_volume is not None:
+            rvs_ml = oil_volume * 5
+            accel_ml = oil_volume * 2.5
+        else:
+            rvs_ml = 0
+            accel_ml = 0
+
+    cost_rvs = rvs_ml * RVS_PRICE_PER_ML
+    cost_accel = accel_ml * ACCEL_PRICE_PER_ML
+    cost_raw = cost_rvs + cost_accel
+
+    client_price = cost_raw * MARKUP_COEF
+    profit = client_price - cost_raw
+
+    return rvs_ml, accel_ml, cost_raw, client_price, profit
+
 
 # ===== Состояния диалога =====
 (
@@ -97,14 +153,8 @@ from telegram.ext import (
 
 # ===== /start =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info(">>> Вызван /start от пользователя %s", update.effective_user.id)
     context.user_data.clear()
-# ===== /clean =====
-async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-
-    await update.message.reply_text(
-        "Данные очищены. Начнём заново.\n\nВведите /start"
-    )
 
     await update.message.reply_text(
         "Здравствуйте!\n"
@@ -125,6 +175,14 @@ async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return AGGREGATE
 
+
+# ===== /clean =====
+async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
+
+    await update.message.reply_text(
+        "Данные очищены. Начнём заново.\n\nВведите /start"
+    )
 
 
 # ===== Выбор агрегата =====
@@ -167,7 +225,6 @@ async def aggregate_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return OVERHEAT
 
-    # Некорректный ввод — повторно просим выбрать агрегат
     await update.message.reply_text(
         "Пожалуйста, выберите один из вариантов на клавиатуре.",
         reply_markup=ReplyKeyboardMarkup(
@@ -190,7 +247,6 @@ async def overheat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     aggregate = context.user_data.get("aggregate", "Двигатель")
     answer = update.message.text
 
-    # Ветка для двигателя: вопрос о перегреве
     if aggregate == "Двигатель":
         valid_options_engine = ["Нет", "Был кратковременный", "Да, серьёзно", "Не знаю"]
 
@@ -212,7 +268,6 @@ async def overheat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data["overheat"] = answer
 
-        # Если перегрева не было — пропускаем вопрос про ремонт и сразу к расходу масла
         if answer == "Нет":
             await update.message.reply_text(
                 "Какой расход масла?",
@@ -228,7 +283,6 @@ async def overheat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return OIL_CONSUMPTION
 
-        # Если перегрев был — спрашиваем про ремонт
         await update.message.reply_text(
             "После перегрева двигатель ремонтировался?",
             reply_markup=ReplyKeyboardMarkup(
@@ -244,7 +298,6 @@ async def overheat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REPAIR
 
-    # Ветка для других агрегатов: вопрос "Ездили без масла?"
     valid_options_no_oil = ["Нет", "Кратковременно", "Да, долго", "Не знаю"]
 
     if answer not in valid_options_no_oil:
@@ -286,7 +339,6 @@ async def repair(update: Update, context: ContextTypes.DEFAULT_TYPE):
     aggregate = context.user_data.get("aggregate", "Двигатель")
     answer = update.message.text
 
-    # Ветка для двигателя: уточняем ремонт после перегрева
     if aggregate == "Двигатель":
         valid_options_engine = ["Нет", "Частичный ремонт", "Капитальный ремонт", "Не знаю"]
 
@@ -322,7 +374,6 @@ async def repair(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return OIL_CONSUMPTION
 
-    # Ветка для других агрегатов: уточняем симптомы работы
     valid_options_symptoms = ["Нет", "Незначительные", "Сильные", "Не знаю"]
 
     if answer not in valid_options_symptoms:
@@ -457,14 +508,11 @@ async def oil_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     aggregate = context.user_data.get("aggregate", "Двигатель")
     engine_volume_value = context.user_data.get("engine_volume")
 
-    # Расчёт стоимости обработки (не показывается клиенту, выводится только в консоль)
     try:
         if aggregate == "Двигатель" and engine_volume_value is not None and oil_volume_value is not None:
-            # Двигатель: РВС по объёму двигателя, ускоритель по маслу
             rvs_ml = engine_volume_value * RVS_DOSE_ML_PER_L_ENGINE
             accel_ml = oil_volume_value * ACCEL_DOSE_ML_PER_L_OIL
         else:
-            # ГУР, МКПП, АКПП, Вариатор — считаем только по объёму масла
             if oil_volume_value is not None:
                 rvs_ml = oil_volume_value * 5
                 accel_ml = oil_volume_value * 2.5
@@ -506,13 +554,13 @@ async def oil_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Ф.И.О. клиента =====
 async def client_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
-    
+
     if len(name) < 2:
         await update.message.reply_text(
             "Пожалуйста, укажите ваше полное Ф.И.О. (минимум 2 символа)."
         )
         return CLIENT_NAME
-    
+
     context.user_data["client_name"] = name
 
     await update.message.reply_text(
@@ -525,16 +573,13 @@ async def client_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.text.strip()
 
-    # ===== Улучшенная валидация контакта =====
     phone_digits = re.sub(r"\D", "", contact)
 
-    # Телефон РФ: 11 цифр, начинается с 7 или 8
     is_phone = (
         (phone_digits.startswith("7") and len(phone_digits) == 11) or
         (phone_digits.startswith("8") and len(phone_digits) == 11)
     )
 
-    # Telegram username: @ и 5–32 символа (латиница, цифры, _)
     is_username = re.fullmatch(r"@[A-Za-z0-9_]{5,32}", contact) is not None
 
     if not (is_phone or is_username):
@@ -546,7 +591,6 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CLIENT_CONTACT
 
     context.user_data["client_contact"] = contact
-
 
     aggregate = context.user_data.get("aggregate", "Двигатель")
 
@@ -566,10 +610,7 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     client_name_value = context.user_data.get("client_name")
     client_contact_value = context.user_data.get("client_contact")
 
-
-
-	        # ===== Заключение для клиента =====
-
+    # Заключение для клиента
     if aggregate == "Двигатель":
         if (
             overheat == "Да, серьёзно"
@@ -607,10 +648,7 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         + "\n\nНаш специалист свяжется с вами для уточнения деталей."
     )
 
-
     await update.message.reply_text(text)
-
-
 
     # ===== Сохранение заявки в файл =====
     try:
@@ -675,6 +713,7 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if symptoms:
                 card_lines.append(f"🔊 Симптомы: {symptoms}")
 
+        # ВСЕГДА добавляем материалы и финансы, если они посчитаны
         if rvs_ml is not None or accel_ml is not None:
             card_lines.append("")
             card_lines.append("🧪 Материалы:")
@@ -696,6 +735,12 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=card_text)
         except Exception as e:
             logging.error(f"Ошибка при отправке карточки администратору: {e}")
+
+    # Предложение обработать ещё один агрегат
+    await update.message.reply_text(
+        "Если хотите рассчитать обработку ещё одного агрегата,\n"
+        "нажмите /start."
+    )
 
     print("Функция client_contact завершилась")
     return ConversationHandler.END
@@ -726,7 +771,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-# ===== Запуск =====
 def main():
     token = os.getenv("BOT_TOKEN")
 
@@ -736,7 +780,6 @@ def main():
 
     app = ApplicationBuilder().token(token).build()
 
-    # Диалог
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -757,7 +800,6 @@ def main():
         allow_reentry=True,
     )
 
-
     app.add_handler(conv)
 
     # Отдельные команды
@@ -770,4 +812,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
