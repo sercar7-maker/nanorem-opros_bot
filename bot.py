@@ -24,8 +24,8 @@ RVS_DOSE_ML_PER_L_ENGINE = 10.0     # РВС: 10 мл на 1 литр рабоч
 ACCEL_DOSE_ML_PER_L_OIL = 2.5       # Ускоритель: 2.5 мл на 1 литр масла
 
 # Стоимость материалов и наценка (загружаются из .env)
-RVS_PRICE_PER_ML = float(os.getenv("RVS_PRICE_PER_ML", "0.8"))      # Себестоимость РВС за 1 мл
-ACCEL_PRICE_PER_ML = float(os.getenv("ACCEL_PRICE_PER_ML", "0.6")) # Себестоимость ускорителя за 1 мл
+RVS_PRICE_PER_ML = float(os.getenv("RVS_PRICE_PER_ML", "70"))      # Себестоимость РВС за 1 мл
+ACCEL_PRICE_PER_ML = float(os.getenv("ACCEL_PRICE_PER_ML", "30")) # Себестоимость ускорителя за 1 мл
 MARKUP_COEF = float(os.getenv("MARKUP_COEF", "2.0"))                # Коэффициент наценки для клиентской цены
 
 # Коэффициенты для разных агрегатов (можно править под свою экономику)
@@ -148,7 +148,8 @@ def calculate_treatment_cost(aggregate, engine_volume, oil_volume):
     OIL_VOLUME,
     CLIENT_NAME,
     CLIENT_CONTACT,
-) = range(9)
+    RESTART,
+) = range(10)
 
 
 # ===== /start =====
@@ -738,12 +739,18 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Предложение обработать ещё один агрегат
     await update.message.reply_text(
-        "Если хотите рассчитать обработку ещё одного агрегата,\n"
-        "нажмите /start."
+        "Хотите выбрать обработку ещё одного агрегата?",
+        reply_markup=ReplyKeyboardMarkup(
+            [
+                ["🔄 Выбрать ещё один агрегат"],
+                ["❌ Завершить"],
+            ],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        ),
     )
 
-    print("Функция client_contact завершилась")
-    return ConversationHandler.END
+    return RESTART
 
 
 
@@ -770,6 +777,21 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+# ===== Повторный выбор =====
+async def restart_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if "Выбрать" in text:
+        context.user_data.clear()
+        return await start(update, context)
+
+    await update.message.reply_text(
+        "Спасибо за обращение! Если понадобится выбор — нажмите /start.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+    return ConversationHandler.END
+
 
 def main():
     token = os.getenv("BOT_TOKEN")
@@ -792,7 +814,9 @@ def main():
             OIL_VOLUME: [MessageHandler(filters.TEXT & ~filters.COMMAND, oil_volume)],
             CLIENT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, client_name)],
             CLIENT_CONTACT: [MessageHandler(filters.TEXT & ~filters.COMMAND, client_contact)],
+            RESTART: [MessageHandler(filters.TEXT & ~filters.COMMAND, restart_choice)],
         },
+
         fallbacks=[
             CommandHandler("cancel", cancel),
             CommandHandler("start", start),
