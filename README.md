@@ -29,8 +29,8 @@ Telegram-бот для консультации клиентов по приме
 2. Создайте файл `.env` в корне проекта со следующим содержимым:
    ```
    BOT_TOKEN=ваш_токен_здесь
-   RVS_PRICE_PER_ML=0.8
-   ACCEL_PRICE_PER_ML=0.6
+   RVS_PRICE_PER_ML=70
+   ACCEL_PRICE_PER_ML=30
    MARKUP_COEF=2.0
    ```
 
@@ -38,20 +38,20 @@ Telegram-бот для консультации клиентов по приме
    ```bash
    # Windows PowerShell
    $env:BOT_TOKEN="ваш_токен_здесь"
-   $env:RVS_PRICE_PER_ML="0.8"
-   $env:ACCEL_PRICE_PER_ML="0.6"
+   $env:RVS_PRICE_PER_ML="70"
+   $env:ACCEL_PRICE_PER_ML="30"
    $env:MARKUP_COEF="2.0"
    
    # Windows CMD
    set BOT_TOKEN=ваш_токен_здесь
-   set RVS_PRICE_PER_ML=0.8
-   set ACCEL_PRICE_PER_ML=0.6
+   set RVS_PRICE_PER_ML=70
+   set ACCEL_PRICE_PER_ML=30
    set MARKUP_COEF=2.0
    
    # Linux/Mac
    export BOT_TOKEN="ваш_токен_здесь"
-   export RVS_PRICE_PER_ML="0.8"
-   export ACCEL_PRICE_PER_ML="0.6"
+   export RVS_PRICE_PER_ML="70"
+   export ACCEL_PRICE_PER_ML="30"
    export MARKUP_COEF="2.0"
    ```
 
@@ -65,8 +65,8 @@ Telegram-бот для консультации клиентов по приме
    Чтобы узнать свой ID, напишите боту [@userinfobot](https://t.me/userinfobot) в Telegram.
 
 4. (Опционально) Настройте финансовые параметры в файле `.env`:
-   - `RVS_PRICE_PER_ML` - себестоимость РВС за 1 мл (по умолчанию: 0.8)
-   - `ACCEL_PRICE_PER_ML` - себестоимость ускорителя за 1 мл (по умолчанию: 0.6)
+   - `RVS_PRICE_PER_ML` - себестоимость РВС за 1 мл (по умолчанию: 70)
+   - `ACCEL_PRICE_PER_ML` - себестоимость ускорителя за 1 мл (по умолчанию: 30)
    - `MARKUP_COEF` - коэффициент наценки для клиентской цены (по умолчанию: 2.0)
    
    Все параметры загружаются автоматически из `.env` файла при запуске бота.
