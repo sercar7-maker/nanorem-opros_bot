@@ -575,20 +575,17 @@ async def client_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.text.strip()
 
-    phone_digits = re.sub(r"\\D", "", contact)
-    is_phone = (
-        (phone_digits.startswith("7") and len(phone_digits) == 11)
-        or (phone_digits.startswith("8") and len(phone_digits) == 11)
-    )
-    is_username = re.fullmatch(r"@[A-Za-z0-9_]{5,32}", contact) is not None
+    # убираем всё, что не цифра
+    phone_digits = re.sub(r"\D", "", contact)
+    is_phone = len(phone_digits) >= 10  # пропускаем любые нормальные номера
+    is_username = contact.startswith("@") and len(contact) >= 5
 
     if not (is_phone or is_username):
         await update.message.reply_text(
-            "Пожалуйста, укажите корректный номер телефона "
-            "(пример: +79041234567 или 89041234567) "
-            "или корректный @username в Telegram."
+            "Пожалуйста, укажите номер телефона или @username для связи."
         )
         return CLIENT_CONTACT
+
 
 
     context.user_data["client_contact"] = contact
