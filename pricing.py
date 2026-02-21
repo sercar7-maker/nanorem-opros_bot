@@ -1,13 +1,18 @@
 import os
 
-# Дозировки
-RVS_DOSE_ML_PER_L_ENGINE = 10.0
-ACCEL_DOSE_ML_PER_L_OIL = 2.5
+# Берём только число после знака "=", если вдруг переменная задана в формате RVS_PRICE_PER_ML=70
+def _clean_number(env_value: str, default: str) -> float:
+    if not env_value:
+        env_value = default
+    # Если строка вида "RVS_PRICE_PER_ML=70" — берём часть после "="
+    if "=" in env_value:
+        env_value = env_value.split("=", 1)[1]
+    return float(env_value)
 
-# Цены (берём из .env)
-RVS_PRICE_PER_ML = float(os.getenv("RVS_PRICE_PER_ML", "70"))
-ACCEL_PRICE_PER_ML = float(os.getenv("ACCEL_PRICE_PER_ML", "30"))
-MARKUP_COEF = float(os.getenv("MARKUP_COEF", "2.0"))
+RVS_PRICE_PER_ML = _clean_number(os.getenv("RVS_PRICE_PER_ML"), "70")
+ACCEL_PRICE_PER_ML = _clean_number(os.getenv("ACCEL_PRICE_PER_ML"), "30")
+MARKUP_COEF = _clean_number(os.getenv("MARKUP_COEF"), "2.0")
+SHOW_PRICE_TO_CLIENT = os.getenv("SHOW_PRICE_TO_CLIENT", "false").lower() == "true"
 
 # Базовая работа (подправь под себя)
 BASE_WORK_COST = {
