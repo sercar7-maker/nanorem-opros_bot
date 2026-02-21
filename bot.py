@@ -23,7 +23,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 # Читаем настройки из .env
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "0"))
+ADMIN_CHAT_ID = _clean_int(os.getenv("ADMIN_CHAT_ID"), "0")
 
 # Показывать ли цены клиенту в ответе бота
 SHOW_PRICE_TO_CLIENT = os.getenv("SHOW_PRICE_TO_CLIENT", "false").lower() == "true"
