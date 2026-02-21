@@ -655,6 +655,8 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
     # ===== Сохранение заявки в файл =====
+    printable_quote = None  # одна переменная и для файла, и для карточки
+
     try:
         applications_dir = Path("applications")
         applications_dir.mkdir(exist_ok=True)
@@ -683,17 +685,16 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
 
         # Текст для клиента (для печати/копирования)
-        printable_quote = None
         if (
             material_price_client is not None
             and work_cost is not None
             and total_price_client is not None
         ):
             printable_quote = (
-                "Предварительный расчёт стоимости обработки NANOREM:\n\n"
-                f"Материалы: {material_price_client:.2f} руб.\n"
-                f"Работа: {work_cost:.2f} руб.\n"
-                f"ИТОГО: {total_price_client:.2f} руб.\n\n"
+                "Предварительный расчёт стоимости обработки NANOREM:\\n\\n"
+                f"Материалы: {material_price_client:.2f} руб.\\n"
+                f"Работа: {work_cost:.2f} руб.\\n"
+                f"ИТОГО: {total_price_client:.2f} руб.\\n\\n"
                 "Расчёт предварительный, окончательная стоимость может быть скорректирована "
                 "по результатам диагностики и осмотра."
             )

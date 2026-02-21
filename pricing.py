@@ -1,4 +1,6 @@
 import os
+import logging
+
 
 # Берём только число после знака "=", если вдруг переменная задана в формате RVS_PRICE_PER_ML=70
 def _clean_number(env_value: str, default: str) -> float:
@@ -43,6 +45,15 @@ def calculate_treatment_cost(aggregate, engine_volume=None, oil_volume=None, cyl
     profit
     """
 
+    # ЛОГ ДЛЯ ПРОВЕРКИ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ НА RAILWAY
+    logging.info(
+        "DEBUG pricing env: RVS_PRICE_PER_ML=%s, ACCEL_PRICE_PER_ML=%s, MARKUP_COEF=%s, SHOW_PRICE_TO_CLIENT=%s",
+        os.getenv("RVS_PRICE_PER_ML"),
+        os.getenv("ACCEL_PRICE_PER_ML"),
+        os.getenv("MARKUP_COEF"),
+        os.getenv("SHOW_PRICE_TO_CLIENT"),
+    )
+
     # --- Материалы ---
     rvs_ml = 0
     accel_ml = 0
@@ -70,8 +81,6 @@ def calculate_treatment_cost(aggregate, engine_volume=None, oil_volume=None, cyl
     else:
         work_cost = base_work
 
-
-
     if aggregate == "Двигатель" and engine_volume and engine_volume >= HEAVY_ENGINE_THRESHOLD_L:
         work_cost *= HEAVY_ENGINE_COEF
 
@@ -89,4 +98,5 @@ def calculate_treatment_cost(aggregate, engine_volume=None, oil_volume=None, cyl
         total_price_client,
         profit,
     )
+
 
