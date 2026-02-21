@@ -840,8 +840,16 @@ async def restart_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+def _clean_str(env_value: str) -> str:
+    if not env_value:
+        return ""
+    if "=" in env_value:
+        env_value = env_value.split("=", 1)[1]
+    return env_value.strip()
+
 def main():
-    token = os.getenv("BOT_TOKEN")
+    raw_token = os.getenv("BOT_TOKEN")
+    token = _clean_str(raw_token)
     if not token:
         logging.error("Токен бота не найден! Установите переменную окружения BOT_TOKEN.")
         return
