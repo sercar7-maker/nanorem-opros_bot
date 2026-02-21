@@ -575,7 +575,7 @@ async def client_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.text.strip()
 
-    phone_digits = re.sub(r"\D", "", contact)
+    phone_digits = re.sub(r"\\D", "", contact)
     is_phone = (
         (phone_digits.startswith("7") and len(phone_digits) == 11)
         or (phone_digits.startswith("8") and len(phone_digits) == 11)
@@ -589,6 +589,7 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "или корректный @username в Telegram."
         )
         return CLIENT_CONTACT
+
 
     context.user_data["client_contact"] = contact
 
