@@ -599,6 +599,36 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     engine_volume_value = context.user_data.get("engine_volume")
     oil_volume_value = context.user_data.get("oil_volume")
 
+    engine_volume_value = context.user_data.get("engine_volume")
+    oil_volume_value = context.user_data.get("oil_volume")
+
+    # Пересчёт материалов и цены перед формированием карточки
+    try:
+        (
+            rvs_ml,
+            accel_ml,
+            material_cost,
+            material_price_client,
+            work_cost,
+            total_price_client,
+            profit,
+        ) = calculate_treatment_cost(
+            aggregate=aggregate,
+            engine_volume=engine_volume_value,
+            oil_volume=oil_volume_value,
+            cylinders=context.user_data.get("cylinders"),
+        )
+
+        context.user_data["rvs_ml"] = rvs_ml
+        context.user_data["accel_ml"] = accel_ml
+        context.user_data["material_cost"] = material_cost
+        context.user_data["material_price_client"] = material_price_client
+        context.user_data["work_cost"] = work_cost
+        context.user_data["total_price_client"] = total_price_client
+        context.user_data["profit"] = profit
+    except Exception as e:
+        logging.error(f"Ошибка при расчёте стоимости в client_contact: {e}")
+
     rvs_ml = context.user_data.get("rvs_ml")
     accel_ml = context.user_data.get("accel_ml")
     material_cost = context.user_data.get("material_cost")
@@ -609,6 +639,7 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     client_name_value = context.user_data.get("client_name")
     client_contact_value = context.user_data.get("client_contact")
+
 
     # Заключение для клиента
     if aggregate == "Двигатель":
