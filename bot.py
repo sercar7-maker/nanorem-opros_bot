@@ -491,6 +491,14 @@ async def oil_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     engine_volume_value = context.user_data.get("engine_volume")
     cylinders = context.user_data.get("cylinders")
 
+    logging.info(
+        "DEBUG before calc: aggregate=%s, engine_volume=%s, oil_volume=%s, cylinders=%s",
+        aggregate,
+        engine_volume_value,
+        oil_volume_value,
+        cylinders,
+    )
+
     try:
         (
             rvs_ml,
@@ -535,6 +543,8 @@ async def oil_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Укажите марку и модель вашего транспортного средства (например: Toyota Camry 2.4)."
     )
     return VEHICLE_INFO
+
+
 
 
 # ===== Марка и модель ТС =====
