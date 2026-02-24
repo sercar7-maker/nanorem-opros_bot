@@ -700,14 +700,15 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             and total_price_client is not None
         ):
             printable_quote = (
-                "Предварительный расчёт стоимости обработки NANOREM:\\n\\n"
-                f"Материалы: {material_price_client:.2f} руб.\\n"
-                f"Работа: {work_cost:.2f} руб.\\n"
-                f"ИТОГО: {total_price_client:.2f} руб.\\n\\n"
+                "Предварительный расчёт стоимости обработки NANOREM:\n\n"
+                f"Материалы: {material_price_client:.2f} руб.\n"
+                f"Работа: {work_cost:.2f} руб.\n"
+                f"ИТОГО: {total_price_client:.2f} руб.\n\n"
                 "Расчёт предварительный, окончательная стоимость может быть скорректирована "
                 "по результатам диагностики и осмотра."
             )
             application_data["printable_quote"] = printable_quote
+
 
         filename = applications_dir / f"application_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         with open(filename, "w", encoding="utf-8") as f:
