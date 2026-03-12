@@ -62,7 +62,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["Двигатель"],
         ["МКПП"],
         ["АКПП"],
-        ["Вариатор"],
+        ["Редуктор (мост)"],
         ["ГУР"],
     ]
 
@@ -111,7 +111,7 @@ async def aggregate_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["Двигатель"],
         ["МКПП"],
         ["АКПП"],
-        ["Вариатор"],
+        ["Редуктор (мост)"],
         ["ГУР"],
     ]
 
@@ -127,7 +127,7 @@ async def aggregate_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return OVERHEAT
 
-    if choice in ["МКПП", "АКПП", "Вариатор", "ГУР"]:
+    if choice in ["МКПП", "АКПП", "Редуктор (мост)", "ГУР"]:
         await update.message.reply_text(
             "Задам несколько вопросов, чтобы понять, подходит ли обработка NANOREM "
             "для выбранного агрегата.\n\n"
@@ -409,7 +409,7 @@ async def engine_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text(
             "Пожалуйста, введите корректный объём двигателя в литрах, например: 1.6\n"
-            "Допустимый диапазон: от 0.6 до 20.0 л."
+            "Допустимый диапазон: от 0.6 до 100.0 л."
         )
         return ENGINE_VOLUME
 
@@ -444,7 +444,7 @@ async def cylinders_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Допустимый диапазон, подправь под себя
     if cylinders < 2 or cylinders > 16:
         await update.message.reply_text(
-            "Пожалуйста, введите реалистичное количество цилиндров (от 2 до 16)."
+            "Пожалуйста, введите реалистичное количество цилиндров (от 2 до 20)."
         )
         return CYLINDERS
 
@@ -467,22 +467,22 @@ async def oil_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
         oil_volume_value = float(text)
 
         if aggregate == "Двигатель":
-            if oil_volume_value < 2.0 or oil_volume_value > 40.0:
+            if oil_volume_value < 2.0 or oil_volume_value > 70.0:
                 raise ValueError
         else:
-            if oil_volume_value < 0.3 or oil_volume_value > 60.0:
+            if oil_volume_value < 0.3 or oil_volume_value > 100.0:
                 raise ValueError
 
     except ValueError:
         if aggregate == "Двигатель":
             await update.message.reply_text(
                 "Пожалуйста, введите корректный объём масла в двигателе, например: 4\n"
-                "Допустимый диапазон: от 2 до 40 л."
+                "Допустимый диапазон: от 2 до 70 л."
             )
         else:
             await update.message.reply_text(
                 "Пожалуйста, введите корректный объём масла в агрегате, например: 4\n"
-                "Допустимый диапазон: от 0.3 до 60 л."
+                "Допустимый диапазон: от 0.3 до 100 л."
             )
         return OIL_VOLUME
 
