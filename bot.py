@@ -1,4 +1,5 @@
 import asyncio
+import csv
 import logging
 import os
 import json
@@ -6,6 +7,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
 from telegram import (
     Update,
@@ -31,10 +33,51 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 REPLY_DELAY_SECONDS = 3
+GOOGLE_SHEETS_WEBHOOK_URL = os.getenv(
+    "GOOGLE_SHEETS_WEBHOOK_URL",
+    "https://script.google.com/macros/s/AKfycbxkxg3rqI9zoOMhrT60nUrXOfApVD4FpLiPFJiEPw_EWDOWfmo-cghMtgEFEEkujBl8Dg/exec",
+).strip()
 
 
 async def _sleep_before_reply():
     await asyncio.sleep(REPLY_DELAY_SECONDS)
+
+
+def _normalize_google_script_url(url: str) -> str:
+    url = (url or "").strip().replace(" ", "")
+    if not url:
+        return ""
+
+    # Sometimes the URL is accidentally duplicated like:
+    # https://script.google.com/macros/s/https://script.google.com/macros/s/<ID>/exec/exec
+    duplicated_prefix = "https://script.google.com/macros/s/https://script.google.com/macros/s/"
+    if url.startswith(duplicated_prefix):
+        url = "https://script.google.com/macros/s/" + url[len(duplicated_prefix) :]
+
+    while url.endswith("/exec/exec"):
+        url = url[: -len("/exec")]
+
+    if not url.endswith("/exec") and "/exec" not in url:
+        url = url.rstrip("/") + "/exec"
+
+    return url
+
+
+async def _post_to_google_sheets(payload: dict):
+    url = _normalize_google_script_url(GOOGLE_SHEETS_WEBHOOK_URL)
+    if not url:
+        return
+
+    def _do_post():
+        return requests.post(url, json=payload, timeout=10)
+
+    resp = await asyncio.to_thread(_do_post)
+    if not resp.ok:
+        logging.error(
+            "Google Sheets webhook returned %s: %s",
+            resp.status_code,
+            (resp.text or "")[:500],
+        )
 
 
 async def call_client_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -770,6 +813,64 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logging.error(f"Ошибка при сохранении заявки: {e}")
+
+    # ===== Сохранение лида в CSV =====
+    try:
+        applications_dir = Path("applications")
+        applications_dir.mkdir(exist_ok=True)
+
+        leads_csv_path = applications_dir / "leads.csv"
+        file_exists = leads_csv_path.exists()
+
+        headers = [
+            "дата",
+            "имя клиента",
+            "контакт",
+            "агрегат",
+            "марка авто",
+            "объем двигателя",
+            "объем масла",
+            "итоговая цена",
+            "прибыль",
+        ]
+
+        row = {
+            "дата": datetime.now().isoformat(sep=" ", timespec="seconds"),
+            "имя клиента": client_name_value or "",
+            "контакт": client_contact_value or "",
+            "агрегат": aggregate or "",
+            "марка авто": context.user_data.get("vehicle_info") or "",
+            "объем двигателя": engine_volume_value if engine_volume_value is not None else "",
+            "объем масла": oil_volume_value if oil_volume_value is not None else "",
+            "итоговая цена": (
+                f"{total_price_client:.2f}" if total_price_client is not None else ""
+            ),
+            "прибыль": f"{profit:.2f}" if profit is not None else "",
+        }
+
+        with open(leads_csv_path, "a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=headers)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении лида в CSV: {e}")
+
+    # ===== Отправка лида в Google Sheets (POST JSON) =====
+    try:
+        payload = {
+            "name": client_name_value or "",
+            "contact": client_contact_value or "",
+            "aggregate": aggregate or "",
+            "vehicle": context.user_data.get("vehicle_info") or "",
+            "engine_volume": engine_volume_value,
+            "oil_volume": oil_volume_value,
+            "price": total_price_client,
+            "profit": profit,
+        }
+        await _post_to_google_sheets(payload)
+    except Exception as e:
+        logging.error(f"Ошибка при отправке лида в Google Sheets: {e}")
 
     # ===== Отправка карточки администратору =====
     if ADMIN_CHAT_ID:
