@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import json
@@ -27,6 +28,13 @@ from pricing import calculate_treatment_cost  # расчёт материало�
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
+
+REPLY_DELAY_SECONDS = 3
+
+
+async def _sleep_before_reply():
+    await asyncio.sleep(REPLY_DELAY_SECONDS)
+
 
 def _clean_int(env_value: str, default: str) -> int:
     if not env_value:
@@ -63,6 +71,7 @@ SHOW_PRICE_TO_CLIENT = os.getenv("SHOW_PRICE_TO_CLIENT", "false").lower() == "tr
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info(">>> Вызван /start от пользователя %s", update.effective_user.id)
     context.user_data.clear()
+    await _sleep_before_reply()
 
     keyboard = [
         ["Двигатель"],
@@ -90,6 +99,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== /clean =====
 async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
+    await _sleep_before_reply()
     await update.message.reply_text(
         "Данные очищены. Начнём заново.\n\nВведите /start",
         reply_markup=ReplyKeyboardRemove(),
@@ -100,6 +110,7 @@ async def clean(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def aggregate_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text
     context.user_data["aggregate"] = choice
+    await _sleep_before_reply()
 
     engine_keyboard = [
         ["Нет"],
@@ -162,6 +173,7 @@ async def aggregate_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def overheat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     aggregate = context.user_data.get("aggregate", "Двигатель")
     answer = update.message.text
+    await _sleep_before_reply()
 
     if aggregate == "Двигатель":
         valid_options_engine = ["Нет", "Был кратковременный", "Да, серьёзно", "Не знаю"]
@@ -262,6 +274,7 @@ async def overheat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def repair(update: Update, context: ContextTypes.DEFAULT_TYPE):
     aggregate = context.user_data.get("aggregate", "Двигатель")
     answer = update.message.text
+    await _sleep_before_reply()
 
     if aggregate == "Двигатель":
         valid_options_engine = ["Нет", "Частичный ремонт", "Капитальный ремонт", "Не знаю"]
@@ -332,6 +345,7 @@ async def repair(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Расход масла =====
 async def oil_consumption(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text
+    await _sleep_before_reply()
     valid_options = [
         "До 0.5 л / 1000 км",
         "0.5–1 л / 1000 км",
@@ -376,6 +390,7 @@ async def oil_consumption(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Дым =====
 async def smoke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = update.message.text
+    await _sleep_before_reply()
     valid_options = ["Нет", "Синий", "Белый", "Чёрный"]
     smoke_keyboard = [
         ["Нет"],
@@ -407,6 +422,7 @@ async def smoke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Объём двигателя =====
 async def engine_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().replace(",", ".")
+    await _sleep_before_reply()
     try:
         engine_volume_value = float(text)
         # Диапазон под себя, пример: 0.6–20.0
@@ -438,6 +454,7 @@ async def engine_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Количество цилиндров =====
 async def cylinders_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    await _sleep_before_reply()
 
     if not text.isdigit():
         await update.message.reply_text(
@@ -467,6 +484,7 @@ async def cylinders_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Объём масла + расчёт =====
 async def oil_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().replace(",", ".")
+    await _sleep_before_reply()
     aggregate = context.user_data.get("aggregate", "Двигатель")
 
     try:
@@ -556,6 +574,7 @@ async def oil_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Марка и модель ТС =====
 async def vehicle_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     info = update.message.text.strip()
+    await _sleep_before_reply()
     if len(info) < 2:
         await update.message.reply_text(
             "Пожалуйста, укажите марку и модель полностью, например: MAN TGS 18.440."
@@ -573,6 +592,7 @@ async def vehicle_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Ф.И.О. клиента =====
 async def client_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
+    await _sleep_before_reply()
     if len(name) < 2:
         await update.message.reply_text(
             "Пожалуйста, укажите ваше полное Ф.И.О. (минимум 2 символа)."
@@ -590,6 +610,7 @@ async def client_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Контакт клиента, заключение, сохранение, уведомление админу =====
 async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.text.strip()
+    await _sleep_before_reply()
 
     # убираем всё, что не цифра
     phone_digits = re.sub(r"\D", "", contact)
@@ -796,35 +817,44 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         card_text = "\n".join(card_lines)
 
         try:
-            reply_markup = None
-            if is_phone:
+            if not is_phone:
+                await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=card_text)
+            else:
                 normalized_digits = phone_digits
                 if len(normalized_digits) == 11 and normalized_digits.startswith("8"):
                     normalized_digits = "7" + normalized_digits[1:]
                 elif len(normalized_digits) == 10:
                     normalized_digits = "7" + normalized_digits
 
-                tel_url = f"tel:+{normalized_digits}"
-                reply_markup = InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("📞 Позвонить клиенту", url=tel_url)]]
+                tel_urls = (
+                    f"tel:+{normalized_digits}",
+                    f"tel:%2B{normalized_digits}",
                 )
 
-            try:
-                await context.bot.send_message(
-                    chat_id=ADMIN_CHAT_ID,
-                    text=card_text,
-                    reply_markup=reply_markup,
-                )
-            except Exception as e:
-                if reply_markup is not None:
+                sent_with_button = False
+                last_error = None
+                for tel_url in tel_urls:
+                    reply_markup = InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("📞 Позвонить клиенту", url=tel_url)]]
+                    )
+                    try:
+                        await context.bot.send_message(
+                            chat_id=ADMIN_CHAT_ID,
+                            text=card_text,
+                            reply_markup=reply_markup,
+                        )
+                        sent_with_button = True
+                        break
+                    except Exception as e:
+                        last_error = e
+
+                if not sent_with_button:
                     logging.error(
-                        "Ошибка при отправке карточки администратору с кнопкой: %s. "
-                        "Повторяю отправку без кнопки.",
-                        e,
+                        "Не удалось отправить карточку с кнопкой звонка (%s). "
+                        "Отправляю без кнопки.",
+                        last_error,
                     )
                     await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=card_text)
-                else:
-                    raise
         except Exception as e:
             logging.error(f"Ошибка при отправке карточки администратору: {e}")
 
@@ -847,6 +877,7 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== /help =====
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _sleep_before_reply()
     help_text = (
         "🤖 Помощник Петя по авто-продукции NANOREM\n\n"
         "Я помогу вам определить, подходит ли обработка NANOREM для вашего агрегата.\n\n"
@@ -863,6 +894,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== /cancel =====
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _sleep_before_reply()
     await update.message.reply_text(
         "Консультация завершена.",
         reply_markup=ReplyKeyboardRemove(),
@@ -873,6 +905,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== Повторный выбор =====
 async def restart_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    await _sleep_before_reply()
 
     if "Выбрать" in text:
         context.user_data.clear()
