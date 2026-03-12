@@ -809,11 +809,22 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [[InlineKeyboardButton("📞 Позвонить клиенту", url=tel_url)]]
                 )
 
-            await context.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=card_text,
-                reply_markup=reply_markup,
-            )
+            try:
+                await context.bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=card_text,
+                    reply_markup=reply_markup,
+                )
+            except Exception as e:
+                if reply_markup is not None:
+                    logging.error(
+                        "Ошибка при отправке карточки администратору с кнопкой: %s. "
+                        "Повторяю отправку без кнопки.",
+                        e,
+                    )
+                    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=card_text)
+                else:
+                    raise
         except Exception as e:
             logging.error(f"Ошибка при отправке карточки администратору: {e}")
 
