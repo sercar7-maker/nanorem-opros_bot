@@ -6,7 +6,13 @@ from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -790,7 +796,24 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         card_text = "\n".join(card_lines)
 
         try:
-            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=card_text)
+            reply_markup = None
+            if is_phone:
+                normalized_digits = phone_digits
+                if len(normalized_digits) == 11 and normalized_digits.startswith("8"):
+                    normalized_digits = "7" + normalized_digits[1:]
+                elif len(normalized_digits) == 10:
+                    normalized_digits = "7" + normalized_digits
+
+                tel_url = f"tel:+{normalized_digits}"
+                reply_markup = InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("📞 Позвонить клиенту", url=tel_url)]]
+                )
+
+            await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=card_text,
+                reply_markup=reply_markup,
+            )
         except Exception as e:
             logging.error(f"Ошибка при отправке карточки администратору: {e}")
 
