@@ -19,6 +19,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     ConversationHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
@@ -34,6 +35,32 @@ REPLY_DELAY_SECONDS = 3
 
 async def _sleep_before_reply():
     await asyncio.sleep(REPLY_DELAY_SECONDS)
+
+
+async def call_client_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if query is None:
+        return
+
+    data = query.data or ""
+    if not data.startswith("call_client:"):
+        await query.answer()
+        return
+
+    await query.answer()
+
+    phone_digits = data.split("call_client:", 1)[1].strip()
+    if not phone_digits.isdigit():
+        return
+
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=(
+            "📞 Телефон клиента:\n"
+            f"+{phone_digits}\n\n"
+            f"Ссылка для звонка: tel:+{phone_digits}"
+        ),
+    )
 
 
 def _clean_int(env_value: str, default: str) -> int:
@@ -826,35 +853,21 @@ async def client_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 elif len(normalized_digits) == 10:
                     normalized_digits = "7" + normalized_digits
 
-                tel_urls = (
-                    f"tel:+{normalized_digits}",
-                    f"tel:%2B{normalized_digits}",
+                reply_markup = InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "📞 Позвонить клиенту",
+                                callback_data=f"call_client:{normalized_digits}",
+                            )
+                        ]
+                    ]
                 )
-
-                sent_with_button = False
-                last_error = None
-                for tel_url in tel_urls:
-                    reply_markup = InlineKeyboardMarkup(
-                        [[InlineKeyboardButton("📞 Позвонить клиенту", url=tel_url)]]
-                    )
-                    try:
-                        await context.bot.send_message(
-                            chat_id=ADMIN_CHAT_ID,
-                            text=card_text,
-                            reply_markup=reply_markup,
-                        )
-                        sent_with_button = True
-                        break
-                    except Exception as e:
-                        last_error = e
-
-                if not sent_with_button:
-                    logging.error(
-                        "Не удалось отправить карточку с кнопкой звонка (%s). "
-                        "Отправляю без кнопки.",
-                        last_error,
-                    )
-                    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=card_text)
+                await context.bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=card_text,
+                    reply_markup=reply_markup,
+                )
         except Exception as e:
             logging.error(f"Ошибка при отправке карточки администратору: {e}")
 
@@ -957,6 +970,7 @@ def main():
         allow_reentry=True,
     )
 
+    app.add_handler(CallbackQueryHandler(call_client_callback, pattern=r"^call_client:"))
     app.add_handler(conv)
     app.add_handler(CommandHandler("clean", clean))
     app.add_handler(CommandHandler("help", help_command))
